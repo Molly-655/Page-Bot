@@ -24,40 +24,43 @@ def execute(message, sender_id):
                 }
             ]
         data = response.json()
-        image_url = data.get("images")
+        image_url = data.get("image")
         text_response = data.get("response", "")
-        if not image_url:
-            return [
-                {
+
+        messages = []
+        # If image exists, add it first
+        if image_url:
+            try:
+                img_response = requests.get(image_url, stream=True, timeout=30)
+                if img_response.status_code == 200:
+                    image_bytes = BytesIO(img_response.content)
+                    messages.append({
+                        "success": True,
+                        "type": "image",
+                        "data": image_bytes
+                    })
+                else:
+                    messages.append({
+                        "success": False,
+                        "type": "text",
+                        "data": "❌ Failed to fetch the generated image."
+                    })
+            except Exception as e:
+                messages.append({
                     "success": False,
                     "type": "text",
-                    "data": "❌ No image returned from the API."
-                }
-            ]
-        # Download the image as bytes
-        img_response = requests.get(image_url, stream=True, timeout=30)
-        if img_response.status_code != 200:
-            return [
-                {
-                    "success": False,
-                    "type": "text",
-                    "data": "❌ Failed to fetch the generated image."
-                }
-            ]
-        image_bytes = BytesIO(img_response.content)
-        # Return image first, then text as separate messages (as a list)
-        return [
-            {
-                "success": True,
-                "type": "image",
-                "data": image_bytes
-            },
-            {
+                    "data": f"🚨 Error fetching image: {str(e)}"
+                })
+
+        # Always include the text response (after the image, if any)
+        if text_response:
+            messages.append({
                 "success": True,
                 "type": "text",
                 "data": text_response
-            }
-        ]
+            })
+
+        return messages
     except Exception as e:
         return [
             {
